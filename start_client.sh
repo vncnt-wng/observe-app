@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+export LS_SERVICE_NAME=hello-server2
+export LS_ACCESS_TOKEN=aMcsMEmLBM3k8Jgohd3iMYjxRzuLxlVUdT3bzAdCKbiPVb8PBSBknSYHetnT2C9AEatw/GxIZZEu/GWVI5U4IpNvBc3Bu1fXbxgrRC1B
+
+python3 client.py
