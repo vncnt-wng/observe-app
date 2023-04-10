@@ -4,6 +4,7 @@ import inspect
 
 tracer = trace.get_tracer(__name__)
 
+
 def trace_function(func):
     def wrapper(*args, **kw):
         with tracer.start_as_current_span(f"{func.__name__}") as span:
