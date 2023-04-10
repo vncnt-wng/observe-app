@@ -114,6 +114,7 @@ def func1(arg1, arg2):
     return func2(3)
 
 
+
 @trace_function
 def func2(arg1):
     sleep(30/1000)
