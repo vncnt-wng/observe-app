@@ -101,8 +101,9 @@ def called(arg1, arg2):
     # print(span2.spanId)
     return
 
-@trace_function
+
 @app.route("/trace_endpoint")
+@trace_function
 def endpoint():
     sleep(30/1000)
     return func1(1, 2)

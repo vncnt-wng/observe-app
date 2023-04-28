@@ -76,4 +76,5 @@ def trace_function(func):
                 span.set_attribute("message", message)
             
             return func(*args, **kw)
+    wrapper.__name__ = func.__name__
     return wrapper
