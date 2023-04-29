@@ -7,6 +7,11 @@ import re
 from opentelemetry import trace
 
 
+def get_git_root() -> str:
+    completed_process = subprocess.run(['git', 'rev-parse', '--show-toplevel'], stdout=subprocess.PIPE)
+    # [:-1] to remove endline
+    return completed_process.stdout.decode("utf-8")[:-1] + '/'
+
 """
 Returns the current commit, branch and message if available, else None
 """
@@ -19,18 +24,12 @@ def parse_git_reflog() -> Tuple[str, str, str]:
     ba89296 (b1) HEAD@{2}: commit (initial): .
     """
     branch_name = check_git_repository()
-    print(branch_name)
     if branch_name != None:
         stdout_lines = subprocess.run(['git', 'reflog', '--decorate'], stdout=subprocess.PIPE).stdout.decode('utf-8').split('\n')
-        print(stdout_lines)
         for line in stdout_lines:
-            
             substrings = line.split(': ')
-            
-            print(substrings)
             if substrings[1] == 'commit':
                 commit_details = re.split(r'\(|\)', substrings[0])
-                print(commit_details)
                 commit_id = commit_details[0][:-1]
                 branches = commit_details[1].split('-> ')[1].split(', ')
                 message = substrings[-1]
@@ -49,9 +48,11 @@ def check_git_repository() -> str:
         return completed_process.stdout.decode('utf-8').split('\n')[0].split('On branch ')[1]
     return None
 
-
+git_root = get_git_root()
 tracer = trace.get_tracer(__name__)
 commit_id, branch, message = parse_git_reflog()
+
+print(git_root)
 
 """
 Wrapper function that starts a new otel trace on a function, recording function details as attributes
@@ -59,7 +60,8 @@ Wrapper function that starts a new otel trace on a function, recording function 
 def trace_function(func):
     def wrapper(*args, **kw):
         with tracer.start_as_current_span(f"{func.__name__}") as span:
-            span.set_attribute(f"file", os.path.abspath(inspect.getfile(func)))
+            absolute_path = os.path.abspath(inspect.getfile(func))
+            span.set_attribute(f"file", absolute_path.replace(git_root, ''))
             qualname = func.__qualname__
             span.set_attribute(f"qualName", qualname)
 
