@@ -3,6 +3,7 @@ import os
 import inspect 
 import subprocess
 import re
+import json
 
 from opentelemetry import trace
 
@@ -52,13 +53,27 @@ git_root = get_git_root()
 tracer = trace.get_tracer(__name__)
 commit_id, branch, message = parse_git_reflog()
 
-print(git_root)
+
+
+# dumps a class object to json (shallow)
+def dump_obj_to_json(obj):
+    data = {}
+    data['type'] = "class"
+    data["className"] = type(obj).__name__
+    values = obj.__dict__
+    for key in values.keys():
+        typeObj = type(values[key])
+        # if attribute is an object, just record the class name 
+        if '__dict__' in typeObj.__dict__:
+            values[key] = {"class": typeObj.__name__}
+    data['values'] = values
+    return json.dumps(data)
 
 """
 Wrapper function that starts a new otel trace on a function, recording function details as attributes
 """
 def trace_function(func):
-    def wrapper(*args, **kw):
+    def wrapper(*args, **kwargs):
         with tracer.start_as_current_span(f"{func.__name__}") as span:
             absolute_path = os.path.abspath(inspect.getfile(func))
             span.set_attribute(f"file", absolute_path.replace(git_root, ''))
@@ -69,14 +84,30 @@ def trace_function(func):
             arg_start = 0
             if len(qualname.split('.')) > 1:
                 arg_start = 1
+                
+            func_args = list(inspect.signature(func).parameters.keys())
             for n in range(arg_start, len(args)):
-                span.set_attribute(f"arg{n}", args[n])
+                print('__dict__' in type(args[n]).__dict__)
+                print(type(args[n]).__name__ )
+                if '__dict__' in type(args[n]).__dict__:
+                    span.set_attribute(func_args[n], dump_obj_to_json(args[n]))
+                    # args_data[func_args[n]] = dump_obj_to_json(args[n])
+                elif type(args[n]).__name__ == 'dict':
+                    span.set_attribute(func_args[n], json.dumps({'type': 'dict', 'value': args[n]}))
+                elif type(args[n]).__name__ == 'set' :
+                    span.set_attribute(func_args[n], json.dumps({'type': 'set', 'value': list(args[n])}))
+                elif type(args[n]).__name__ == 'list' :
+                    span.set_attribute(func_args[n], json.dumps({'type': 'list', 'value': args[n]}))
+                else:
+                    span.set_attribute(func_args[n], args[n])
+                    # args_data[func_args[n]] = args[n]
+                    
                 
             if branch: 
                 span.set_attribute("commit_id", commit_id)
                 span.set_attribute("branch", branch)
                 span.set_attribute("message", message)
             
-            return func(*args, **kw)
+            return func(*args, **kwargs)
     wrapper.__name__ = func.__name__
     return wrapper

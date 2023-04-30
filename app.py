@@ -128,6 +128,62 @@ def across_file():
     return "ok"
 
 
+@app.route("/flame_test")
+@trace_function
+def flame_test():
+    sleep(10/1000)
+    sub1()
+    sub2()
+    return "ok"
+
+@trace_function
+def sub1():
+    subsub1()
+    subsub2() 
+    
+@trace_function
+def sub2():
+    sleep(5/1000)
+    subsub3() 
+    
+@trace_function
+def subsub1():
+    sleep(8/1000)
+    
+@trace_function
+def subsub2():
+    sleep(5/1000)
+    
+@trace_function
+def subsub3():
+    sleep(10/1000)
+    
+    
+class Example:
+    def __init__(self):
+        self.attr1 = 5
+        self.attr2 = "string"
+        self.attr3 = [1,2,3]
+        self.attr4 = {"a":1, "b":2}
+        self.attr5 = Example2()
+
+    def func(self):
+        pass
+
+class Example2:
+    def __init__(self):
+        self.attr1 = "string"
+
+@app.route("/parameter_test")
+@trace_function
+def parameter_test():
+    parameter_called(0, 0.1, "hello", [1,2,3], {1,2}, {"a": 1, "b": 2}, Example())
+    return "hello"
+
+@trace_function
+def parameter_called(i, f, str, l, s, d, o):
+    return 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT)
  
