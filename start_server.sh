@@ -8,7 +8,7 @@ export FLASK_DEBUG=FALSE
 
 opentelemetry-instrument \
   --traces_exporter console,otlp_proto_http \
-  --metrics_exporter console \
+  --metrics_exporter none \
   --service_name test \
   --exporter_otlp_endpoint "http://127.0.0.1:8000" \
   --exporter_otlp_insecure true \

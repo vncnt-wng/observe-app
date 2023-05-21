@@ -9,7 +9,9 @@ import { BatchSpanProcessor, ConsoleSpanExporter } from "@opentelemetry/sdk-trac
 import opentelemetry, { trace, context, propagation } from "@opentelemetry/api";
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
-import { traceFunction, traceFunctionMiddleWare, getTraceStateHeader } from './trace_utils';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
+
+import { traceFunction, traceFunctionMiddleWare, traceFunctionCallback, getTraceStateHeader, setCorrectFileForMiddlewareSpan } from './trace_utils';
 
 //...
 
@@ -27,7 +29,13 @@ import { traceFunction, traceFunctionMiddleWare, getTraceStateHeader } from './t
 //   );
 
 const provider = new WebTracerProvider();
-const exporter = new ConsoleSpanExporter();
+
+const collectorOptions = {
+    url: "http://127.0.0.1:8000/v1/traces"
+}
+
+// const exporter = new ConsoleSpanExporter()
+const exporter = new OTLPTraceExporter(collectorOptions) //ConsoleSpanExporter();
 const processor = new BatchSpanProcessor(exporter);
 provider.addSpanProcessor(processor);
 
@@ -41,19 +49,23 @@ const sdk = new NodeSDK({
 sdk
     .start()
 
-app.use(traceFunctionMiddleWare)
+// app.use(traceFunctionMiddleWare)
 
 app.get('/', async (req, res) => {
-    // const a = new Thing()
-
+    const returnVal = await traceFunctionCallback("app.get('/')", async () => {
+        const obj = new SomeClass()
+        const param = "hello"
+        const methodReturn = await obj.method(param, param)
+        return methodReturn
+    })
+    console.log(returnVal)
+    // return methodReturn
     // const traced = wrap(getData)
     // console.log(traced)
 
     // console.log(await traced("hehe"));
 
-    const obj = new SomeClass()
-    const param = "hello"
-    obj.method(param, param)
+
     // let value = await traceFunction("trace", obj.method(param))
 
     // console.log(value)
@@ -64,6 +76,38 @@ app.get('/', async (req, res) => {
     res.sendFile('index.html', { root: "./" });
 })
 
+
+app.use('/dist_trace', traceFunctionMiddleWare, async (req, res) => {
+    setCorrectFileForMiddlewareSpan("frontend/app.ts")
+    const random = Math.floor(Math.random() * 4)
+    const headers = getTraceStateHeader()
+    for (let i = 0; i < random; i++) {
+
+        // headers.setAttribute("Content-Type", "application/json")
+
+        const responseData = (
+            await axios.get("http://127.0.0.1:5000/callee", {
+                headers: headers
+            })
+        ).data;
+    }
+    // headers.setAttribute("Content-Type", "application/json")
+
+    const responseData = (
+        await axios.get("http://127.0.0.1:5000/dist_trace", {
+            headers: headers
+        })
+    ).data;
+
+    console.log(headers)
+    res.send("hello")
+})
+
+
+app.use('/callee', traceFunctionMiddleWare, (req, res) => {
+    setCorrectFileForMiddlewareSpan("frontend/app.ts")
+    res.send("hello")
+})
 
 
 class SomeClass {
@@ -77,8 +121,6 @@ class SomeClass {
     @traceFunction
     async method(param1, param2) {
         const headers = getTraceStateHeader()
-        console.log(headers)
-        console.log(this.attr1)
         // headers.setAttribute("Content-Type", "application/json")
 
         const responseData = (

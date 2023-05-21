@@ -240,5 +240,13 @@ def callee():
     return "ok"
 
 
+@app.route("/dist_trace")
+@trace_function
+def dist_trace():
+    headers = add_trace_headers({})
+    r = requests.get("http://127.0.0.1:3001/callee", headers=headers)
+    return "ok"
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT)

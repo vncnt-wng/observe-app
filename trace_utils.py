@@ -68,9 +68,14 @@ def check_git_repository() -> str:
     return None
 
 
-git_root = get_git_root()
+git_root = None
 tracer = trace.get_tracer(__name__)
-commit_id, branch, message = parse_git_reflog()
+commit_id, branch, message = None, None, None
+
+
+if check_git_repository():
+    git_root = get_git_root()
+    commit_id, branch, message = parse_git_reflog()
 
 
 # dumps a class object to json (shallow)
@@ -117,13 +122,9 @@ def trace_function(func):
 
         with tracer.start_as_current_span(f"{func.__name__}", context=ctx) as span:
             try:
-                print(request.headers)
-                if (
-                    "traceparent" in request.headers
-                    and "callerSpanId" in request.headers
-                ):
+                if "traceparent" in request.headers or "Traceparent" in request.headers:
                     print("here")
-                    span.set_attribute("callerSpanId", request.headers["callerSpanId"])
+                    span.set_attribute("parentFromOtherService", True)
             except:
                 print("error")
                 pass
@@ -180,5 +181,6 @@ def add_trace_headers(headers: Dict):
     # For W3c trace context convention
     headers["traceparent"] = carrier["traceparent"]
     headers["callerSpanId"] = hex(trace.get_current_span().get_span_context().span_id)
+    trace.get_current_span().set_attribute("childInOtherService", True)
     print(headers)
     return headers
