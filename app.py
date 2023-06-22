@@ -1,32 +1,38 @@
 from flask import Flask, request
 from time import sleep
+
 from opentelemetry.trace.status import StatusCode
 from other_file import some_function
-from trace_utils import trace_function, trace, add_trace_headers
+
+from trace_utils import trace_function, trace, get_trace_context_headers
 import random
 import requests
 
 # from opentelemetry.instrumentation.flask import FlaskInstrumentor
-# from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-# # from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-# from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-# from opentelemetry.sdk.trace import TracerProvider
-# from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+# from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
 
-# # resource = Resource(attributes={
-# #     SERVICE_NAME: "service_name"
-# # })
+resource = Resource(attributes={SERVICE_NAME: "service_name"})
 
 
-# # provider = TracerProvider(resource=resource)
-# # # processor = BatchSpanProcessor(OTLPSpanExporter(
-# # #     endpoint="http://127.0.0.1:8000/traces"))
-# # processor = BatchSpanProcessor(ConsoleSpanExporter())
-# # provider.add_span_processor(processor)
-# # trace.set_tracer_provider(provider)
+provider = TracerProvider(resource=resource)
 
-PORT = 8000
+# processo = BatchSpanProcessor(
+#     span_exporter=OTLPSpanExporter(endpoint="http://127.0.0.1:8000/v1/traces"),
+#     # schedule_delay_millis=1000,
+#     max_export_batch_size=512,
+#     # max_queue_size=3000,
+# )
+processor = BatchSpanProcessor(ConsoleSpanExporter())
+provider.add_span_processor(processor)
+trace.set_tracer_provider(provider)
+
+PORT = 5000
 
 app = Flask(__name__)
 
@@ -83,19 +89,19 @@ def hello():
 
 
 class Test:
-    @trace_function
+    # @trace_function
     def func(self):
         return "aaa"
 
 
 @app.route("/class_qualname")
-@trace_function
+# @trace_function
 def class_qualname():
     instance = Test()
     return instance.func()
 
 
-@trace_function
+# @trace_function
 def called(arg1, arg2):
     sleep(30 / 1000)
     span = trace.get_current_span()
@@ -105,71 +111,67 @@ def called(arg1, arg2):
 
 
 @app.route("/trace_endpoint")
-@trace_function
+# @trace_function
 def endpoint():
     sleep(30 / 1000)
     return func1(1, 2)
 
 
-@trace_function
+# @trace_function
 def func1(arg1, arg2):
     sleep(30 / 1000)
     return func2(3)
 
 
-@trace_function
+# @trace_function
 def func2(arg1):
     sleep(30 / 1000)
     return "return"
 
 
 @app.route("/accross_file")
-@trace_function
+# @trace_function
 def across_file():
     some_function()
     return "ok"
 
 
 @app.route("/flame_test")
-@trace_function
+# @trace_function
 def flame_test():
-    sleep(10 / 1000)
-    if random.randint(0, 1) == 0:
-        sub1()
-    if random.randint(0, 1) == 0:
-        sub2()
+    sub1()
+    sub2()
     return "ok"
 
 
-@trace_function
+# @trace_function
 def sub1():
     subsub1()
     subsub2()
 
 
-@trace_function
+# @trace_function
 def sub2():
-    sleep(5 / 1000)
     subsub3()
 
 
-@trace_function
+# @trace_function
 def subsub1():
     sleep(8 / 1000)
 
 
-@trace_function
+# @trace_function
 def subsub2():
     sleep(5 / 1000)
 
 
-@trace_function
+# @trace_function
 def subsub3():
     sleep(10 / 1000)
 
 
 @app.route("/multiple_execution_path")
-@trace_function
+# @trace_function
 def multiple_execution_path():
     value = random.randint(0, 1)
     if value == 0:
@@ -179,13 +181,31 @@ def multiple_execution_path():
     return str(value)
 
 
+@app.route("/remote_request")
 @trace_function
+def remote_request():
+    make_request("string value")
+    return "ok", 200
+
+
+@trace_function
+def make_request(value):
+    headers = get_trace_headers()
+    r = requests.post(
+        "http://remote_service_endpoint",
+        headers=headers,
+        json={"value": value},
+    )
+    return
+
+
+# @trace_function
 def path1():
     sleep(0.01)
     pass
 
 
-@trace_function
+# @trace_function
 def path2():
     sleep(0.01)
     pass
@@ -211,26 +231,27 @@ class Example2:
 @app.route("/parameter_test")
 @trace_function
 def parameter_test():
-    parameter_called(0, 0.1, "hello", [1, 2, 3], {1, 2}, {"a": 1, "b": 2}, Example())
-    return "hello"
+    return parameter_called(
+        1, 0.1, "hello", [1, 2, 3], {1, 2}, {"a": 1, "b": 2}, Example2()
+    )
 
 
 @trace_function
-def parameter_called(i, f, str, l, s, d, o):
-    return
+def parameter_called(i, f, string, l, s, d, o):
+    return string
 
 
-@app.route("/distributed")
-@trace_function
-def distributed():
-    return "ok"
+# @app.route("/distributed")
+# @trace_function
+# def distributed():
+#     return "ok"
 
 
 @app.route("/caller")
 @trace_function
 def caller():
-    headers = add_trace_headers({})
-    r = requests.get("http://127.0.0.1:5000/callee", headers=headers)
+    headers = get_trace_context_headers({})
+    r = requests.post("http://127.0.0.1:8000/v1/trace", headers=headers)
     return "ok"
 
 
@@ -240,13 +261,42 @@ def callee():
     return "ok"
 
 
-@app.route("/dist_trace")
+# @app.route("/dist_trace")
+# @trace_function
+# def dist_trace():
+#     headers = add_trace_headers({})
+#     r = requests.get("http://127.0.0.1:3001/callee", headers=headers)
+#     return "ok"
+
+
+@app.route("/trace_test")
 @trace_function
-def dist_trace():
-    headers = add_trace_headers({})
-    r = requests.get("http://127.0.0.1:3001/callee", headers=headers)
-    return "ok"
+def trace_test():
+    str = ""
+    str += child1()
+    str += child2()
+    return str
+
+
+@trace_function
+def child1():
+    return grandchild1()
+
+
+@trace_function
+def grandchild1():
+    return "o"
+
+
+@trace_function
+def child2():
+    return grandchild2()
+
+
+@trace_function
+def grandchild2():
+    return "k"
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT)
+    app.run(threaded=False, debug=False, host="0.0.0.0", port=PORT)

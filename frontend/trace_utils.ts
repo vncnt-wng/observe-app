@@ -1,5 +1,5 @@
 import { ChildProcess, execSync } from "child_process";
-import opentelemetry, { trace, context, propagation, Span } from "@opentelemetry/api";
+import opentelemetry, { trace, propagation, Span, context } from "@opentelemetry/api";
 
 
 const getGitRoot = (): string => {
@@ -93,6 +93,22 @@ export function traceFunction(target: any, propertyName: string, descriptor: Typ
     };
 }
 
+
+export function traceFunctionAsync(target: any, propertyName: string, descriptor: TypedPropertyDescriptor<Function>) {
+    let method = descriptor.value!;
+    const filePath = _getCallerFile()
+    const spanContext = context.active()
+    console.log(spanContext)
+    descriptor.value = async function (...args: any[]) {
+        return tracer.startActiveSpan(propertyName, {}, spanContext, async (span: Span) => {
+            const result = await method.apply(this, args)
+            setSpanAttributes(filePath, propertyName, this, span)
+            span.end()
+            return result
+        })
+    };
+}
+
 const setSpanAttributes = (filePath: string, name: string, context: Object, span: Span) => {
     const pathFromGitRoot = String(filePath).replace(String(git_root), '')
 
@@ -114,7 +130,7 @@ export const traceFunctionMiddleWare = (req, res, next) => {
         activeContext = propagation.extract(context.active(), req.headers)
     }
     const name = "app.use('" + req.originalUrl + "')"
-    return tracer.startActiveSpan("app.use('" + req.originalUrl + ")",
+    return tracer.startActiveSpan(name,
         {},
         activeContext, (span) => {
             if (activeContext != undefined) {
@@ -147,7 +163,7 @@ export const traceFunctionCallback = (name: string, callback: Function) => {
 }
 
 
-export const getTraceStateHeader = () => {
+export const getTraceContextHeaders = () => {
     const output = {}
     propagation.inject(context.active(), output);
     // not necessary, we flag children - trace.getActiveSpan().setAttribute("childInOtherService", true)

@@ -7,7 +7,7 @@ export FLASK_DEBUG=FALSE
 # export OTEL_EXPORTER_OTLP_TRACES_HEADERS="lightstep-access-token=6FTjYBFuvKftJCAyzzOqgsK6o5wH5DOIa/7wa3lFhc5jdAjvwgh/inl33mJ8/barjhxwGdH1MkuAvJkBZfNtv2UHMIauCO0/HmQwCyA5"
 
 opentelemetry-instrument \
-  --traces_exporter console,otlp_proto_http \
+  --traces_exporter otlp_proto_http \
   --metrics_exporter none \
   --service_name test \
   --exporter_otlp_endpoint "http://127.0.0.1:8000" \

@@ -117,16 +117,13 @@ def trace_function(func):
         except:
             pass
 
-        print("context")
-        print(ctx)
-
         with tracer.start_as_current_span(f"{func.__name__}", context=ctx) as span:
             try:
                 if "traceparent" in request.headers or "Traceparent" in request.headers:
-                    print("here")
+                    # print("here")
                     span.set_attribute("parentFromOtherService", True)
             except:
-                print("error")
+                # print("error")
                 pass
 
             absolute_path = os.path.abspath(inspect.getfile(func))
@@ -141,8 +138,8 @@ def trace_function(func):
 
             func_args = list(inspect.signature(func).parameters.keys())
             for n in range(arg_start, len(args)):
-                print("__dict__" in type(args[n]).__dict__)
-                print(type(args[n]).__name__)
+                # print("__dict__" in type(args[n]).__dict__)
+                # print(type(args[n]).__name__)
                 if "__dict__" in type(args[n]).__dict__:
                     span.set_attribute(func_args[n], dump_obj_to_json(args[n]))
                     # args_data[func_args[n]] = dump_obj_to_json(args[n])
@@ -175,12 +172,12 @@ def trace_function(func):
 
 
 # Adds trace headers to a header dictionary
-def add_trace_headers(headers: Dict):
+def get_trace_context_headers(headers: Dict):
     carrier = {}
     TraceContextTextMapPropagator().inject(carrier)
     # For W3c trace context convention
     headers["traceparent"] = carrier["traceparent"]
     headers["callerSpanId"] = hex(trace.get_current_span().get_span_context().span_id)
     trace.get_current_span().set_attribute("childInOtherService", True)
-    print(headers)
+    # print(headers)
     return headers
